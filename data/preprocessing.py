@@ -41,7 +41,7 @@ class Preprocessing:
         ]
 
         # information data
-        self.name_engine = sorted(
+        self.name_subset = sorted(
             list(
                 {
                     re.search(r"_(.+)\.", i).group(1)
@@ -122,20 +122,24 @@ class Preprocessing:
 
         return tabular_file, tabular_unit
 
-    def plot_ts(self, name_data, type_data, engine, feature=None, normalize=False):
+    def plot_ts(self, name_subset, type_data, engine, feature=None, normalize=False):
         """
         plot engine feature
         """
         # load data csv
         path_csv = os.path.join(
-            self.path_cmapss_directory, f"{type_data}_{name_data}.csv"
+            self.path_cmapss_directory, f"{type_data}_{name_subset}.csv"
         )
         df = pd.read_csv(path_csv)
 
         # check if plot single or multiple engine
         indices_engine = np.where(df.iloc[:, 0] == engine)[0]
         df_engine = df.iloc[indices_engine, 2:]
-        df_engine = df_engine.iloc[:, [feature]] if feature is not None else df_engine
+        df_engine = (
+            df_engine.iloc[:, [feature - 2]]
+            if feature not in [None, "all"]
+            else df_engine
+        )
 
         # normalize
         scaler = StandardScaler()
@@ -149,7 +153,7 @@ class Preprocessing:
         fig = go.Figure()
         cycle = list(range(len(df_engine)))
 
-        for c in df_engine.columns:
+        for f, c in enumerate(df_engine.columns):
             value = df_engine[c]
             fig.add_trace(
                 go.Scatter(
@@ -163,8 +167,18 @@ class Preprocessing:
 
         # add layout
         feature = "all" if feature == None else feature
+        RUL = 0
+        if type_data == "test":
+            path_csv_test = os.path.join(
+                self.path_cmapss_directory, f"RUL_{name_subset}.csv"
+            )
+            df_test = pd.read_csv(path_csv_test)
+            RUL = df_test.iloc[engine, 0]
+
+        title = f"Subset{name_subset}, engine {engine}, feature {feature}, normalize {normalize}, n_cycle {len(cycle)}, RUL {RUL}"
+
         fig.update_layout(
-            title=f"Engine {engine}, feature {feature}, normalize {normalize}",
+            title=title,
             xaxis_title="Cycle",
             yaxis_title="Value",
             legend_title="Feature",
@@ -187,5 +201,5 @@ if __name__ == "__main__":
     text_to_csv = preprocessing.text_to_csv()
     # table_analysis = preprocessing.table_analysis()
     plot_ts = preprocessing.plot_ts(
-        name_data="FD001", type_data="train", engine=1, feature=None, normalize=True
+        name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
     )
