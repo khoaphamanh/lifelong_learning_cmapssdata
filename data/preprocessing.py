@@ -3,6 +3,8 @@ import os
 import re
 from tabulate import tabulate
 import numpy as np
+import plotly.graph_objects as go
+from sklearn.preprocessing import StandardScaler
 
 
 # Preprocessing class
@@ -51,7 +53,7 @@ class Preprocessing:
         self.type_data = ["train", "test"]
 
         # save file to csv
-        if not any([os.path.exists(i) for i in self.path_csv_files]):
+        if any([not os.path.exists(i) for i in self.path_csv_files]):
             self.text_to_csv()
 
     def text_to_csv(
@@ -107,7 +109,7 @@ class Preprocessing:
 
         # append to have all same len values for dict_analysis_unit
         max_len_values_dict_unit = max([len(i) for i in dict_analysis_unit.values()])
-        dict_analysis_unit["1unit"] = list(range(max_len_values_dict_unit))
+        dict_analysis_unit["1unit"] = list(range(1, max_len_values_dict_unit + 1))
         for k, v in dict_analysis_unit.items():
             dict_analysis_unit[k] = v + [None] * (max_len_values_dict_unit - len(v))
         dict_analysis_unit = {
@@ -120,10 +122,70 @@ class Preprocessing:
 
         return tabular_file, tabular_unit
 
+    def plot_ts(self, name_data, type_data, engine, feature=None, normalize=False):
+        """
+        plot engine feature
+        """
+        # load data csv
+        path_csv = os.path.join(
+            self.path_cmapss_directory, f"{type_data}_{name_data}.csv"
+        )
+        df = pd.read_csv(path_csv)
+
+        # check if plot single or multiple engine
+        indices_engine = np.where(df.iloc[:, 0] == engine)[0]
+        df_engine = df.iloc[indices_engine, 2:]
+        df_engine = df_engine.iloc[:, [feature]] if feature is not None else df_engine
+
+        # normalize
+        scaler = StandardScaler()
+        df_engine = (
+            pd.DataFrame(scaler.fit_transform(df_engine), columns=df_engine.columns)
+            if normalize
+            else df_engine
+        )
+
+        # plot the image
+        fig = go.Figure()
+        cycle = list(range(len(df_engine)))
+
+        for c in df_engine.columns:
+            value = df_engine[c]
+            fig.add_trace(
+                go.Scatter(
+                    x=cycle,
+                    y=value,
+                    mode="lines",
+                    name=f"Feature {c}",
+                    showlegend=True,
+                )
+            )
+
+        # add layout
+        feature = "all" if feature == None else feature
+        fig.update_layout(
+            title=f"Engine {engine}, feature {feature}, normalize {normalize}",
+            xaxis_title="Cycle",
+            yaxis_title="Value",
+            legend_title="Feature",
+            template="plotly_white",
+        )
+
+        fig.show()
+
+        # check constant column
+        column_constant = df.columns[df.nunique() == 1]
+        print("Constant columns:", list(column_constant))
+
+        return fig
+
 
 if __name__ == "__main__":
 
     preprocessing = Preprocessing()
 
-    # text_to_csv = preprocessing.text_to_csv()
-    table_analysis = preprocessing.table_analysis()
+    text_to_csv = preprocessing.text_to_csv()
+    # table_analysis = preprocessing.table_analysis()
+    plot_ts = preprocessing.plot_ts(
+        name_data="FD001", type_data="train", engine=1, feature=None, normalize=True
+    )
