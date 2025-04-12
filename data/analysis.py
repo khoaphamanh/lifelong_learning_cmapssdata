@@ -181,6 +181,7 @@ class Analysis(Preprocessing):
 
         # RUL
         feature = "all" if feature == None else feature
+
         # add layout
         RUL = 0
         if type_data == "test":
@@ -208,15 +209,16 @@ class Analysis(Preprocessing):
         return fig
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-# analyxix = Analysis()
+    analyxix = Analysis()
 
-# text_to_csv = analyxix.text_to_csv()
-# plot_ts = analyxix.plot_visulize_ts(
-#     name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
-# )
+    # text_to_csv = analyxix.text_to_csv()
 
-# plot_histogram = analyxix.plot_visualize_feature_histogram(
-#     name_subset="FD001", type_data="train", engine=1, normalize=True
-# )
+    plot_ts = analyxix.plot_visulize_ts(
+        name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
+    )
+
+    plot_histogram = analyxix.plot_visualize_feature_histogram(
+        name_subset="FD001", type_data="train", engine=1, normalize=True
+    )
