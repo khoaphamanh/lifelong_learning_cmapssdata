@@ -187,7 +187,7 @@ class Preprocessing:
         """
         windowing each engine
         """
-        # window dict
+        # windows dict
         X_train = {}
         y_train = {}
         X_test = {}
@@ -204,6 +204,15 @@ class Preprocessing:
             # loop for each subset
             for name_subset, df_data in data_dict.items():
                 engines = df_data.iloc[:, 0].unique()
+
+                # add keys as name subset to windows dict
+                if idx_d == 0:
+                    X_train[name_subset] = []
+                    y_train[name_subset] = []
+                else:
+                    X_test[name_subset] = []
+                    y_test[name_subset] = []
+
                 # loop for each engine
                 for eng in engines:
                     indices_engine = np.where(df_data.iloc[:, 0] == eng)[0]
@@ -214,6 +223,18 @@ class Preprocessing:
                     # print("df_engine shape:", df_engine.shape)
 
                     # number of windows
+                    n_rows = len(df_engine)
+
+                    # padding if n_rows smaller than window size
+                    if n_rows < window_size:
+                        n_cols = df_engine.shape[1]
+                        df_pad = pd.DataFrame(
+                            [[0] * (n_cols)] * (window_size - n_rows),
+                            columns=df_engine.columns,
+                        )
+                        df_engine = pd.concat([df_pad, df_engine], ignore_index=True)
+
+                    # windowing and find the correspond rul
                     n_rows = len(df_engine)
                     n_windows = (n_rows - window_size) // hop_size + 1
                     windows = np.array(
@@ -229,15 +250,33 @@ class Preprocessing:
                             for i in range(n_windows)
                         ]
                     )
-                    if eng == 248 and name_subset == "FD004" and idx_d == 1:
-                        print("windows:", windows)
-                        print("ruls:", ruls)
-                        break
-                    # loop for each window
-                    # for i in range(n_windows):
-                    #     w =
-                # if name_subset == "FD001" and idx_d == 0:
-                #     break
+
+                    # ruls for test data
+                    ruls = (
+                        ruls + test_rul[name_subset].iloc[eng - 1, 0]
+                        if idx_d == 1
+                        else ruls
+                    )
+
+                    # append to dict
+                    if idx_d == 0:
+                        X_train[name_subset].append(windows)
+                        y_train[name_subset].append(ruls)
+
+                    else:
+                        X_test[name_subset].append(windows)
+                        y_test[name_subset].append(ruls)
+
+                # concatnate for all engines in a same subset
+                if idx_d == 0:
+                    X_train[name_subset] = np.vstack(X_train[name_subset])
+                    y_train[name_subset] = np.concatenate(y_train[name_subset])
+
+                else:
+                    X_test[name_subset] = np.vstack(X_test[name_subset])
+                    y_test[name_subset] = np.concatenate(y_test[name_subset])
+
+        return X_train, X_test, y_train, y_test
 
 
 if __name__ == "__main__":
@@ -265,6 +304,9 @@ if __name__ == "__main__":
 
     # load_raw_data = preprocessing.load_raw_df_data(normalize=False)
 
-    windowing = preprocessing.windowing(normalize=False)
+    X_train, X_test, y_train, y_test = preprocessing.windowing(normalize=False)
+    # for i, j in X_train.items():
+    #     print(j.shape)
+
     end = default_timer()
     print(end - start)
