@@ -192,6 +192,7 @@ class Preprocessing:
         y_train = {}
         X_test = {}
         y_test = {}
+        n_windows_pro_train_engines = {}
 
         # load raw data df
         train_data, test_data, test_rul = self.load_raw_df_data(normalize=normalize)
@@ -209,6 +210,8 @@ class Preprocessing:
                 if idx_d == 0:
                     X_train[name_subset] = []
                     y_train[name_subset] = []
+                    n_windows_pro_train_engines[name_subset] = []
+
                 else:
                     X_test[name_subset] = []
                     y_test[name_subset] = []
@@ -262,6 +265,7 @@ class Preprocessing:
                     if idx_d == 0:
                         X_train[name_subset].append(windows)
                         y_train[name_subset].append(ruls)
+                        n_windows_pro_train_engines[name_subset].append(n_windows)
 
                     else:
                         X_test[name_subset].append(windows)
@@ -276,7 +280,30 @@ class Preprocessing:
                     X_test[name_subset] = np.vstack(X_test[name_subset])
                     y_test[name_subset] = np.concatenate(y_test[name_subset])
 
-        return X_train, X_test, y_train, y_test
+        return X_train, X_test, y_train, y_test, n_windows_pro_train_engines
+
+    def get_n_check_points_pro_engine(self, n_checkpoint, ratios_dict):
+        """
+        find the number of checkpoints based on number of windows in each engine
+        """
+        # number of checkpoints pro engine dict
+        n_checkpoints_pro_engines_dict = {}
+
+        # number of checkpoints per engine
+        for name_subset, ratios in ratios_dict.items():
+
+            # total ratios
+            total_ratio = sum(ratios)
+
+            # number of checkpoints per engine each subset
+            n_checkpoints_pro_engines = np.floor(
+                [(r / total_ratio * n_checkpoint) for r in ratios]
+            )
+
+            # save to dict
+            n_checkpoints_pro_engines_dict[name_subset] = n_checkpoints_pro_engines
+
+        return n_checkpoints_pro_engines_dict
 
 
 if __name__ == "__main__":
@@ -304,9 +331,33 @@ if __name__ == "__main__":
 
     # load_raw_data = preprocessing.load_raw_df_data(normalize=False)
 
-    X_train, X_test, y_train, y_test = preprocessing.windowing(normalize=False)
+    X_train, X_test, y_train, y_test, n_windows_pro_train_engines = (
+        preprocessing.windowing(normalize=True)
+    )
+
     # for i, j in X_train.items():
-    #     print(j.shape)
+    #     print(i, j.shape)
+
+    # for i, j in n_windows_pro_train_engines.items():
+    #     print(i, sum(j))
+    # # for i in X_test["FD002"]:
+    #     if np.any(i == 0):
+    #         print(i)
+
+    # a = X_test["FD002"][-1]
+    # print("a:", a)
+    # b = y_test["FD002"][-1]
+    # print("b:", b)
+
+    # b = y_test["FD004"]
+    # print("b:", b)
+    n_checkpoints_pro_engines_dict = preprocessing.get_n_check_points_pro_engine(
+        n_checkpoint=100, ratios_dict=n_windows_pro_train_engines
+    )
+    for k, v in n_checkpoints_pro_engines_dict.items():
+        print(k)
+        print(v)
+        print(sum(v))
 
     end = default_timer()
     print(end - start)
