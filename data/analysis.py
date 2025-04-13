@@ -186,13 +186,15 @@ class Analysis(Preprocessing):
         RUL = 0
         if type_data == "test":
             df_test = self.load_visualize_ts_test(name_subset=name_subset)
-            RUL = df_test.iloc[engine, 0]
+            RUL = df_test.iloc[engine - 1, 0]
 
         # add layout
         title = f"Subset {name_subset}, engine {engine}, feature {feature}, normalize {normalize}, n_cycle {len(cycle)}, RUL {RUL}"
 
         fig.update_layout(
             title=title,
+            width=1200,
+            height=600,
             xaxis_title="Cycle",
             yaxis_title="Value",
             legend_title="Feature",
@@ -216,9 +218,9 @@ if __name__ == "__main__":
     # text_to_csv = analyxix.text_to_csv()
 
     plot_ts = analyxix.plot_visulize_ts(
-        name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
+        name_subset="FD004", type_data="test", engine=248, feature=None, normalize=True
     )
 
-    plot_histogram = analyxix.plot_visualize_feature_histogram(
-        name_subset="FD001", type_data="train", engine=1, normalize=True
-    )
+    # plot_histogram = analyxix.plot_visualize_feature_histogram(
+    #     name_subset="FD001", type_data="train", engine=1, normalize=True
+    # )
