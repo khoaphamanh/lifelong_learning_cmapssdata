@@ -131,7 +131,7 @@ class Analysis(Preprocessing):
         RUL = 0
         if type_data == "test":
             df_test = self.load_visualize_ts_test(name_subset=name_subset)
-            RUL = df_test.iloc[engine, 0]
+            RUL = df_test.iloc[engine - 1, 0]
 
         title = f"Subset {name_subset}, engine {engine}, feature all, normalize {normalize}, n_cycle {len(df_engine)}, RUL {RUL}"
 

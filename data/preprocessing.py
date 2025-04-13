@@ -40,8 +40,12 @@ class Preprocessing:
             for i in self.path_text_files
         ]
 
-        # information data
-        self.name_subset = sorted(
+        # preprocessed data
+        self.path_preprocessed_data_directory = os.path.join(
+            self.path_data_directory, "preprocessed"
+        )
+
+        self.name_subsets = sorted(
             list(
                 {
                     re.search(r"_(.+)\.", i).group(1)
@@ -78,13 +82,189 @@ class Preprocessing:
 
             df.to_csv(path_csv_file, index=False)
 
+    def column_constant(self):
+        """
+        find the column with constant values
+        """
+        # column constant dict
+        column_constant_dict = {
+            "FD001": ["4", "5", "9", "10", "14", "20", "22", "23"],
+            "FD002": ["4", "17", "23"],
+            "FD003": ["4", "5", "9", "10", "14", "20", "22", "23"],
+            "FD004": ["4", "17", "23"],
+        }
+
+        return column_constant_dict
+
+    def load_raw_df_data(self, normalize=False):
+        """
+        load raw data and save in a dict (and normalize)
+        """
+        # data dict
+        train_data = {}
+        test_data = {}
+        test_rul = {}
+
+        # path of train, test and rul
+        path_train_subset_csv = [i for i in self.path_csv_files if "train" in i]
+        path_test_subset_csv = [i for i in self.path_csv_files if "test" in i]
+        path_test_rul_csv = [i for i in self.path_csv_files if "RUL" in i]
+
+        # loop through all path
+        for train_csv, test_csv, rul_csv, name_subset in zip(
+            path_train_subset_csv,
+            path_test_subset_csv,
+            path_test_rul_csv,
+            self.name_subsets,
+        ):
+            # read csv
+            df_raw_train = pd.read_csv(train_csv)
+            df_raw_test = pd.read_csv(test_csv)
+            df_rul = pd.read_csv(rul_csv)
+
+            # eliminate the constant columns
+            columns_elim = self.column_constant()[name_subset]
+            df_raw_train = df_raw_train.drop(columns=columns_elim)
+            df_raw_test = df_raw_test.drop(columns=columns_elim)
+
+            # engine
+            engines = df_raw_train.iloc[:, 0].unique()
+            df_train_scaled = []
+            df_test_scaled = []
+
+            for eng in engines:
+
+                # find the indices for each engine
+                indices_eng_train = np.where(df_raw_train.iloc[:, 0] == eng)[0]
+                # print("indices_eng_train:", indices_eng_train)
+                # print(eng)
+                indices_eng_test = np.where(df_raw_test.iloc[:, 0] == eng)[0]
+                # print(eng)
+                # print("indices_eng_test shape:", indices_eng_test.shape)
+                # print("indices_eng_test:", indices_eng_test)
+
+                # indexing each engine
+                df_eng_train = df_raw_train.iloc[indices_eng_train, :]
+                df_eng_test = df_raw_test.iloc[indices_eng_test, :]
+
+                # scale each engine
+                if len(indices_eng_test) > 0:
+                    if normalize:
+                        scaler = StandardScaler()
+                        colums_to_scale = df_raw_train.columns[2:]
+
+                        # copy the data
+                        df_eng_train_scaled = df_eng_train.copy()
+                        df_eng_test_scaled = df_eng_test.copy()
+
+                        df_eng_train_scaled[colums_to_scale] = scaler.fit_transform(
+                            df_eng_train_scaled[colums_to_scale]
+                        )
+                        df_eng_test_scaled[colums_to_scale] = scaler.transform(
+                            df_eng_test_scaled[colums_to_scale]
+                        )
+
+                    else:
+                        df_eng_train_scaled = df_eng_train
+                        df_eng_test_scaled = df_eng_test
+
+                    # append to a big scaled list
+                    df_train_scaled.append(df_eng_train_scaled)
+                    df_test_scaled.append(df_eng_test_scaled)
+
+            # concat the df
+            df_train_scaled = pd.concat(df_train_scaled, ignore_index=True)
+            df_test_scaled = pd.concat(df_test_scaled, ignore_index=True)
+
+            # save to dict
+            train_data[name_subset] = df_train_scaled
+            test_data[name_subset] = df_test_scaled
+            test_rul[name_subset] = df_rul
+
+        return train_data, test_data, test_rul
+
+    def windowing(self, window_size=30, hop_size=1, normalize=False):
+        """
+        windowing each engine
+        """
+        # window dict
+        X_train = {}
+        y_train = {}
+        X_test = {}
+        y_test = {}
+
+        # load raw data df
+        train_data, test_data, test_rul = self.load_raw_df_data(normalize=normalize)
+
+        # windowing for each engine in train data
+        data_list = [train_data, test_data]
+
+        # loop for each data
+        for idx_d, data_dict in enumerate(data_list):
+            # loop for each subset
+            for name_subset, df_data in data_dict.items():
+                engines = df_data.iloc[:, 0].unique()
+                # loop for each engine
+                for eng in engines:
+                    indices_engine = np.where(df_data.iloc[:, 0] == eng)[0]
+                    # print("indices_engine:", indices_engine)
+                    df_engine = df_data.iloc[indices_engine, 2:]
+                    # print(eng)
+                    # print(name_subset)
+                    # print("df_engine shape:", df_engine.shape)
+
+                    # number of windows
+                    n_rows = len(df_engine)
+                    n_windows = (n_rows - window_size) // hop_size + 1
+                    windows = np.array(
+                        [
+                            df_engine.iloc[i * hop_size : i * hop_size + window_size, :]
+                            for i in range(n_windows)
+                        ]
+                    )
+
+                    ruls = np.array(
+                        [
+                            n_rows - (i * hop_size + window_size)
+                            for i in range(n_windows)
+                        ]
+                    )
+                    if eng == 248 and name_subset == "FD004" and idx_d == 1:
+                        print("windows:", windows)
+                        print("ruls:", ruls)
+                        break
+                    # loop for each window
+                    # for i in range(n_windows):
+                    #     w =
+                # if name_subset == "FD001" and idx_d == 0:
+                #     break
+
 
 if __name__ == "__main__":
 
+    from timeit import default_timer
+
+    start = default_timer()
     preprocessing = Preprocessing()
 
-    text_to_csv = preprocessing.text_to_csv()
+    # text_to_csv = preprocessing.text_to_csv()
     # table_analysis = preprocessing.table_analysis()
-    plot_ts = preprocessing.plot_ts(
-        name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
-    )
+    # plot_ts = preprocessing.plot_ts(
+    #     name_subset="FD001", type_data="train", engine=1, feature=None, normalize=True
+    # )
+
+    # path_csv_file = preprocessing.path_csv_files
+    # print("path_csv_file len:", len(path_csv_file))
+    # print("print:", print)
+    # print("path_csv_file:", path_csv_file)
+
+    # column_constant = preprocessing.column_constant()
+    # print("column_constant:", column_constant)
+
+    # print("scaler:", scaler)
+
+    # load_raw_data = preprocessing.load_raw_df_data(normalize=False)
+
+    windowing = preprocessing.windowing(normalize=False)
+    end = default_timer()
+    print(end - start)
