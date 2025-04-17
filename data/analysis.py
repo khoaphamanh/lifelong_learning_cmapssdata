@@ -70,23 +70,17 @@ class Analysis(Preprocessing):
         df = pd.read_csv(path_csv)
 
         # check if plot single or multiple engine
-        indices_engine = np.where(df.iloc[:, 0] == engine)[0]
-        df_engine = df.iloc[indices_engine, 2:]
-        df_engine = (
-            df_engine.iloc[:, [feature - 2]]
-            if feature not in [None, "all"]
-            else df_engine
-        )
+        if engine not in [None, "all"]:
+            indices_engine = np.where(df.iloc[:, 0] == engine)[0]
+            df = df.iloc[indices_engine, 2:]
+            df = df.iloc[:, [feature - 2]] if feature not in [None, "all"] else df
 
         # normalize
-        scaler = StandardScaler()
-        df_engine = (
-            pd.DataFrame(scaler.fit_transform(df_engine), columns=df_engine.columns)
-            if normalize
-            else df_engine
-        )
+        if normalize:
+            scaler = StandardScaler()
+            df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
 
-        return df_engine
+        return df
 
     def load_visualize_ts_test(self, name_subset):
         """
@@ -116,7 +110,7 @@ class Analysis(Preprocessing):
         )
 
         # plot the histogram
-        rows, cols = 6, 4
+        rows, cols = 4, 6
         fig = make_subplots(rows=rows, cols=cols, subplot_titles=df_engine.columns)
 
         # Add a histogram for each feature
@@ -137,8 +131,8 @@ class Analysis(Preprocessing):
 
         # add layout
         fig.update_layout(
-            height=1500,
-            width=1200,
+            height=1200,
+            width=1800,
             title_text=title,
             template="plotly_white",
         )
@@ -148,7 +142,7 @@ class Analysis(Preprocessing):
 
         return fig
 
-    def plot_visulize_ts(
+    def plot_visulize_one_unit(
         self, name_subset, type_data, engine, feature=None, normalize=False
     ):
         """
@@ -210,6 +204,64 @@ class Analysis(Preprocessing):
 
         return fig
 
+    def plot_visualize_all_unit_all_feature(
+        self, name_subset, type_data, normalize=False
+    ):
+        """
+        plot all the unit and all feature in one subplots
+        """
+        # load df_engine
+        df = self.load_visualize_df(
+            name_subset=name_subset,
+            type_data=type_data,
+            engine=None,
+            feature=None,
+            normalize=normalize,
+        )
+
+        # features and engines
+        features = df.columns[2:]
+        engines = df.iloc[:, 0].unique()
+
+        # plot the subplot
+        rows, cols = 4, 6
+        subplot_titles = [f"Feature {f}" for f in features]
+        fig = make_subplots(rows=rows, cols=cols, subplot_titles=subplot_titles)
+
+        # feature loop
+        for i, f in enumerate(features):
+            r = i // cols + 1
+            c = i % cols + 1
+
+            # engine loop
+            for e in engines:
+                # find the indices of the engine
+                indices_engine = np.where(df.iloc[:, 0] == e)[0]
+                df_f_e = df.loc[indices_engine, f]
+
+                # Show legend only once per engine
+                show_legend = bool(i == 0)
+
+                # plot the timeseries for all units and a feature
+                cycle = list(range(len(df_f_e)))
+                fig.add_trace(
+                    go.Scatter(
+                        x=cycle,
+                        y=df_f_e.values,
+                        mode="lines",
+                        name=f"Engine {e}" if show_legend else None,
+                        legendgroup=f"engine_{e}",
+                        showlegend=show_legend,
+                    ),
+                    row=r,
+                    col=c,
+                )
+
+        # tile and fig size
+        title = f"Subset {name_subset}, feature all, normalize {normalize}"
+        fig.update_layout(height=1200, width=1800, title_text=title)
+        fig.show()
+
 
 if __name__ == "__main__":
 
@@ -217,10 +269,14 @@ if __name__ == "__main__":
 
     # text_to_csv = analyxix.text_to_csv()
 
-    plot_ts = analyxix.plot_visulize_ts(
-        name_subset="FD004", type_data="test", engine=248, feature=None, normalize=True
-    )
+    # plot_ts = analyxix.plot_visulize_one_unit(
+    #     name_subset="FD004", type_data="test", engine=248, feature=None, normalize=True
+    # )
 
     # plot_histogram = analyxix.plot_visualize_feature_histogram(
     #     name_subset="FD001", type_data="train", engine=1, normalize=True
     # )
+
+    plot_visualize_all_unit_all_feature = analyxix.plot_visualize_all_unit_all_feature(
+        name_subset="FD001", type_data="train", normalize=False
+    )
